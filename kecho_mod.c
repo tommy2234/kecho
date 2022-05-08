@@ -67,8 +67,19 @@ static int kecho_init_module(void)
      * module parameter "bench=1" to interact with the module.
      * Since without `WQ_UNBOUND` flag specified, a
      * long-running task may delay other tasks in the kernel.
+     *
+     * Unlike a common multithread web server. There is only
+     * "one" kernel thread and a global workqueue kecho_wq in
+     * kecho from the start to the end. The concurrency is
+     * achieved by creating worker for each connection, then
+     * queue them on the global workqueue kecho_wq.
+     * Each worker handles the requests from a connected
+     * socket assigned to it.
      */
+
+    /* create a workqueue */
     kecho_wq = alloc_workqueue(MODULE_NAME, bench ? 0 : WQ_UNBOUND, 0);
+    /* create a kernel thread with the function echo_server_daemon */
     echo_server = kthread_run(echo_server_daemon, &param, MODULE_NAME);
     if (IS_ERR(echo_server)) {
         printk(KERN_ERR MODULE_NAME ": cannot start server daemon\n");

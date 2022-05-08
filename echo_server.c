@@ -9,6 +9,7 @@
 #define BUF_SIZE 4096
 
 struct echo_service daemon = {.is_stopped = false};
+/* A global workqueue */
 extern struct workqueue_struct *kecho_wq;
 
 static int get_request(struct socket *sock, unsigned char *buf, size_t size)
@@ -64,6 +65,12 @@ static int send_request(struct socket *sock, unsigned char *buf, size_t size)
     return length;
 }
 
+/*
+ * The function for each worker(work_struct), assigned to a worker
+ * using INIT_WORK().
+ * It continuously handles requests from the connected socket, till
+ * the daemon is stopped.
+ */
 static void echo_server_worker(struct work_struct *work)
 {
     struct kecho *worker = container_of(work, struct kecho, kecho_work);
@@ -97,6 +104,7 @@ static void echo_server_worker(struct work_struct *work)
     kfree(buf);
 }
 
+/* create a worker(work_struct) to handle a connection using the given socket */
 static struct work_struct *create_work(struct socket *sk)
 {
     struct kecho *work;
@@ -127,6 +135,7 @@ static void free_work(void)
     }
 }
 
+/* continuously create workers, each worker handles an accepted socket */
 int echo_server_daemon(void *arg)
 {
     struct echo_server_param *param = arg;
@@ -156,7 +165,7 @@ int echo_server_daemon(void *arg)
             continue;
         }
 
-        /* start server worker */
+        /* start the server worker, queue the work on the workqueue */
         queue_work(kecho_wq, work);
     }
 
